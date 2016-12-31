@@ -48,7 +48,7 @@ Access: 2016-12-30 17:59:09.120460354 -0500
 Modify: 2016-12-30 17:59:09.120460354 -0500
 Change: 2016-12-30 17:59:22.193321816 -0500
  Birth: -
-$ PWIKI_SYNAPSE_GID=$(stat -c '%g' $PWIKI_SYNAPSE_TLS)
+$ PWIKI_TLS_GID=$(stat -c '%g' $PWIKI_SYNAPSE_TLS)
 ```
 
 ### Synapse config volume
@@ -77,16 +77,16 @@ $ chown -R "$PWIKI_SYNAPSE_UID:$PWIKI_SYNAPSE_GID" "$PWIKI_SYNAPSE_MEDIA"
 ```bash
 $ git clone https://github.com/ThePortalWiki/pwiki-matrix
 $ docker build                               \
-    --build-arg="TLS_GID=$PWIKI_SYNAPSE_GID" \
+    --build-arg="TLS_GID=$PWIKI_TLS_GID" \
     --tag=pwiki-synapse                      \
     pwiki-matrix/images/pwiki-synapse
 ```
 
 ### Build arguments
 
+* `TLS_GID`: The group ID of the TLS mount. Required.
 * `SYNAPSE_UID`: The UID to create the internal user. Optional. Should match `$PWIKI_SYNAPSE_UID`.
 * `SYNAPSE_GID`: The GID to create the internal user. Optional. Should match `$PWIKI_SYNAPSE_GID`.
-* `TLS_GID`: The group ID of the TLS mount. Required.
 * `SYNAPSE_DOMAIN`: The domain name for the Synapse server. You can change this to reuse the image for non-pwiki purposes.
 * `SYNAPSE_PORT`: The *external* port number that will be forwarded to the Synapse server. `8448` by default. It should either be the default, either be whatever is set as Matrix SRV record for `SYNAPSE_DOMAIN`.
 * `REBUILD`: You can set `--build-arg=REBUILD=$(date)` to force a rebuild and update all packages within.
@@ -96,7 +96,7 @@ $ docker build                               \
 Synapse requires a one-time setup step which does a few one-time things, such as:
 
 * Creating a outgoing message signing key.
-* Generating DH parameters.
+* Generating Diffie-Hellman parameters.
 * Initializing the SQLite database tables.
 * Generating the pepper string to use for password hashing.
 
@@ -144,12 +144,16 @@ Your Matrix server should now be running.
 
 # TODO
 
+* Make config persistence more robust (e.g. rewrite known fields on regular startup) rather than write-once
+* Trust other domains for identity purposes (e.g. `perot.me`, `lagg.me`, `colinjstevens.com` etc.)
+* Allow new channel creation by users
+* Turn down local file logging (it's useless in a container).
 * Set up persistent PostgreSQL database
 * Set up Synapse client port w/ reverse proxying
 * Set up Synapse TURN server
 * Set up other container that shows a fancy web client thing
 * Allow guest registration (requirs ReCaptcha)? Or at least guest viewing
-* Enable preview URL API?
+* Enable URL preview API
 * Set up PostgreSQL backups
 
 [Matrix.org]: https://matrix.org/

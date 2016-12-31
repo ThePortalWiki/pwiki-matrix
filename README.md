@@ -53,7 +53,7 @@ $ PWIKI_TLS_GID=$(stat -c '%g' $PWIKI_SYNAPSE_TLS)
 
 ### Synapse config volume
 
-Synapse requires a persistent storage volume to hold configuration data. This is unfortunate, and the reasosn why are documented in another section. The rest of this README assumes that this lives inside `/etc/pwiki-synapse/synapse`. It is mounted as `/synapse` in the Docker container.
+Synapse requires a persistent storage volume to hold configuration data. This is unfortunate, and the reasons why are documented in another section. The rest of this README assumes that this lives inside `/etc/pwiki-synapse/synapse`. It is mounted as `/synapse` in the Docker container.
 
 It is imperative to backup the contents of this volume.
 

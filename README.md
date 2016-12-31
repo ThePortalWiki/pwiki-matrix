@@ -76,9 +76,9 @@ $ chown -R "$PWIKI_SYNAPSE_UID:$PWIKI_SYNAPSE_GID" "$PWIKI_SYNAPSE_MEDIA"
 
 ```bash
 $ git clone https://github.com/ThePortalWiki/pwiki-matrix
-$ docker build                               \
+$ docker build                           \
     --build-arg="TLS_GID=$PWIKI_TLS_GID" \
-    --tag=pwiki-synapse                      \
+    --tag=pwiki-synapse                  \
     pwiki-matrix/images/pwiki-synapse
 ```
 

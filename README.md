@@ -124,8 +124,6 @@ Make sure to set up backup for the contents of this Docker volume on the host.
 
 ## Run the Synapse container
 
-There is
-
 ```bash
 $ docker run                                       \
     --name=pwiki-synapse                           \

@@ -85,8 +85,8 @@ $ docker build                               \
 ### Build arguments
 
 * `TLS_GID`: The group ID of the TLS mount. Required.
-* `SYNAPSE_UID`: The UID to create the internal user. Optional. Should match `$PWIKI_SYNAPSE_UID`.
-* `SYNAPSE_GID`: The GID to create the internal user. Optional. Should match `$PWIKI_SYNAPSE_GID`.
+* `SYNAPSE_UID`: The UID to create the internal user. Optional, default `8449`. Should match `$PWIKI_SYNAPSE_UID`.
+* `SYNAPSE_GID`: The GID to create the internal user. Optional, default `8449`. Should match `$PWIKI_SYNAPSE_GID`.
 * `SYNAPSE_DOMAIN`: The domain name for the Synapse server. You can change this to reuse the image for non-pwiki purposes.
 * `SYNAPSE_PORT`: The *external* port number that will be forwarded to the Synapse server. `8448` by default. It should either be the default, either be whatever is set as Matrix SRV record for `SYNAPSE_DOMAIN`.
 * `REBUILD`: You can set `--build-arg=REBUILD=$(date)` to force a rebuild and update all packages within.
@@ -108,7 +108,7 @@ $ docker run                                   \
     pwiki-synapse /initialize-synapse-onetime.sh
 ```
 
-This will initialize a data container named `pwiki-synapse-initial` and will initialize its `/synapse` volume with the Synapse-generated content: the initial configuration file, and some secrets necessary to run the Synapse server.
+This will initialize the `$PWIKI_SYNAPSE_CONFIG` volume with the Synapse-generated content: the initial configuration file, and some secrets necessary to run the Synapse server.
 
 ```
 /synapse

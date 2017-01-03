@@ -14,9 +14,18 @@ See [Matrix.org].
 
 ## Host setup
 
+### Checkout the repo
+
+```bash
+$ git clone https://github.com/ThePortalWiki/pwiki-matrix
+$ cd pwiki-matrix
+```
+
+Make sure to back these up.
+
 ### Host user
 
-You should create a new user on the host with a unique UID/GID. Reusing the port number of the Synapse server can be helpful here. The rest of this README assumes that the UID/GID are both 8449.
+You should create a new user on the host with a unique UID/GID. Reusing the port number of the Synapse server can be helpful here. The rest of this README assumes that the UID/GID are both `8449`.
 
 ```bash
 $ PWIKI_SYNAPSE_UID=8449
@@ -30,12 +39,12 @@ The Synapse server requires a valid TLS key and certificate in order to work. Th
 
 ```
 /tls
-├── /tls/tls.key  # TLS private key.
-└── /tls/tls.crt  # Complete TLS certificate chain.
+├── tls.key  # TLS private key.
+└── tls.crt  # Complete TLS certificate chain.
 ```
 
 The rest of this README assumes that this lives on the host in the `/etc/pwiki-synapse/tls` directory, and it is group-readable by the host group with GID 9001.
-This GID will be used such that the non-root user inside the Docker container can share the same GID so that it is able to read the TLS files from the `/tls` volume. It is differentiated from `SYNAPSE_GID` so that it remains possible to have certs for a single domain owned by a common `tls` group on the host, rather than having to maintain separate copies.
+This GID will be used such that the non-root user inside the Docker container can share the same GID so that it is able to read the TLS files from the `/tls` volume. It is differentiated from `SYNAPSE_GID` so that it remains possible to have certs for a single domain owned by a shared group on the host, rather than having to maintain separate copies.
 
 ```bash
 $ PWIKI_SYNAPSE_TLS=/etc/pwiki-synapse/tls
@@ -49,16 +58,6 @@ Modify: 2016-12-30 17:59:09.120460354 -0500
 Change: 2016-12-30 17:59:22.193321816 -0500
  Birth: -
 $ PWIKI_TLS_GID=$(stat -c '%g' $PWIKI_SYNAPSE_TLS)
-```
-
-### Synapse config volume
-
-Synapse requires a persistent storage volume to hold configuration data. This is unfortunate, and the reasons why are documented in another section. The rest of this README assumes that this lives inside `/etc/pwiki-synapse/synapse`. It is mounted as `/synapse` in the Docker container.
-
-It is imperative to backup the contents of this volume.
-
-```bash
-$ PWIKI_SYNAPSE_CONFIG=/etc/pwiki-synapse/synapse
 ```
 
 ### Media volume
@@ -75,11 +74,16 @@ $ chown -R "$PWIKI_SYNAPSE_UID:$PWIKI_SYNAPSE_GID" "$PWIKI_SYNAPSE_MEDIA"
 ## Build the Synapse Docker image
 
 ```bash
-$ git clone https://github.com/ThePortalWiki/pwiki-matrix
-$ docker build                           \
-    --build-arg="TLS_GID=$PWIKI_TLS_GID" \
-    --tag=pwiki-synapse                  \
-    pwiki-matrix/images/pwiki-synapse
+$ SYNAPSE_DOMAIN=theportalwiki.com
+$ SYNAPSE_PORT=8449
+$ docker build                                   \
+    --build-arg="SYNAPSE_UID=$PWIKI_SYNAPSE_UID" \
+    --build-arg="SYNAPSE_GID=$PWIKI_SYNAPSE_GID" \
+    --build-arg="TLS_GID=$PWIKI_TLS_GID"         \
+    --build-arg="SYNAPSE_DOMAIN=$SYNAPSE_DOMAIN" \
+    --build-arg="SYNAPSE_PORT=$SYNAPSE_PORT"     \
+    --tag=pwiki-synapse                          \
+    images/pwiki-synapse
 ```
 
 ### Build arguments
@@ -88,46 +92,42 @@ $ docker build                           \
 * `SYNAPSE_UID`: The UID to create the internal user. Optional, default `8449`. Should match `$PWIKI_SYNAPSE_UID`.
 * `SYNAPSE_GID`: The GID to create the internal user. Optional, default `8449`. Should match `$PWIKI_SYNAPSE_GID`.
 * `SYNAPSE_DOMAIN`: The domain name for the Synapse server. You can change this to reuse the image for non-pwiki purposes.
-* `SYNAPSE_PORT`: The *external* port number that will be forwarded to the Synapse server. `8448` by default. It should either be the default, either be whatever is set as Matrix SRV record for `SYNAPSE_DOMAIN`.
+* `SYNAPSE_PORT`: The *external* port number that will be forwarded to the Synapse server. `8448` by default. It should either be the default, either be whatever is set as Matrix SRV record for `SYNAPSE_DOMAIN`. Synapse needs this in order to advertise the correct prot externally.
 * `REBUILD`: You can set `--build-arg=REBUILD=$(date)` to force a rebuild and update all packages within.
 
-## Initialize server config (do this only once, ever)
+## Generate Synapse secrets volume
 
-Synapse requires a one-time setup step which does a few one-time things, such as:
+You need to generate a bunch of secrets for Synapse to work. The rest of this README assumes that you will be storing them in `/etc/pwiki-synapse/secrets`. These will be mounted into the Synapse container as a volume under `/secrets`. They should only be readable by `root`, both inside and outside the container.
 
-* Creating a outgoing message signing key.
-* Generating Diffie-Hellman parameters.
-* Initializing the SQLite database tables.
-* Generating the pepper string to use for password hashing.
+Part of the secrets generation involves generating an `ed25519` signing key using a [special format](https://github.com/matrix-org/python-signedjson), so we use a script bundled within the pwiki-synapse image to generate it.
 
-The output of all of these things needs to remain unchanged even as the Synapse server gets upgraded. To this end, you should do this step only once, ever. Unfortunately, the Synapse configuration file is poorly designed. There is no way to separate these unchanging secret configuration options from the rest. This is why the configuration file is stored in persistent storage, rather than in the image itself. This means that the configuration file might get out of date as new Synapse versions get released, and needs to be manually maintained.
+This only needs to be done once.
 
 ```bash
-$ docker run                                   \
-    --volume="$PWIKI_SYNAPSE_CONFIG:/synapse"  \
-    pwiki-synapse /initialize-synapse-onetime.sh
+$ PWIKI_SYNAPSE_SECRETS=/etc/pwiki-synapse/secrets
+$ docker run --rm                              \
+    --name=pwiki-synapse-secrets               \
+    --volume="$PWIKI_SYNAPSE_SECRETS:/secrets" \
+    pwiki-synapse /generate-secrets.sh
+$ docker rm pwiki-synapse-secrets
+$ tree "$PWIKI_SYNAPSE_SECRETS"
+/etc/pwiki-synapse/secrets
+├── macaroon.key
+├── pepper.key
+├── registration.key
+├── signing.key
+├── signing_key_id.pub
+└── tls.dh
 ```
 
-This will initialize the `$PWIKI_SYNAPSE_CONFIG` volume with the Synapse-generated content: the initial configuration file, and some secrets necessary to run the Synapse server.
-
-```
-/synapse
-├── /synapse/synapse.yaml  # Config file generated during initialization.
-├── /synapse/logging.yaml  # Another config file generated during initialization.
-├── /synapse/pepper        # Pepper for passwords. Must never change. Backup.
-├── /synapse/signing.key   # Private key for signing outgoing messages. Backup.
-├── /synapse/tls.dh        # Diffie-Hellman parameters for ephemeral keys. Regeneratable.
-└── /synapse/db.sqlite     # Main SQLite database. This will eventually change to PostgreSQL.
-```
-
-Make sure to set up backup for the contents of this Docker volume on the host.
+Back up all of these files immediately.
 
 ## Run the Synapse container
 
 ```bash
-$ docker run                                       \
+$ docker run --rm                                  \
     --name=pwiki-synapse                           \
-    --volume="$PWIKI_SYNAPSE_CONFIG:/synapse"      \
+    --volume="$PWIKI_SYNAPSE_SECRETS:/secrets"     \
     --volume="$PWIKI_SYNAPSE_TLS:/tls"             \
     --volume="$PWIKI_SYNAPSE_MEDIA:/synapse-media" \
     --publish="$SYNAPSE_PORT:8448"                 \
@@ -142,7 +142,6 @@ Your Matrix server should now be running.
 
 # TODO
 
-* Make config persistence more robust (e.g. rewrite known fields on regular startup) rather than write-once
 * Trust other domains for identity purposes (e.g. `perot.me`, `lagg.me`, `colinjstevens.com` etc.)
 * Allow new channel creation by users
 * Turn down local file logging (it's useless in a container).
@@ -153,6 +152,7 @@ Your Matrix server should now be running.
 * Allow guest registration (requirs ReCaptcha)? Or at least guest viewing
 * Enable URL preview API
 * Set up PostgreSQL backups
+* Add LetsEncrypt auto cert renewal details
 
 [Matrix.org]: https://matrix.org/
 [Synapse]: https://github.com/matrix-org/synapse

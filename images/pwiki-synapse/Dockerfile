@@ -13,26 +13,23 @@ RUN apt-get update && apt-get upgrade -y
 
 # Get Synapse and related packages.
 COPY get-synapse.sh /tmp/get-synapse.sh
-RUN chmod +x /tmp/get-synapse.sh && /tmp/get-synapse.sh && rm /tmp/get-synapse.sh
+RUN chmod 555 /tmp/get-synapse.sh && /tmp/get-synapse.sh && rm /tmp/get-synapse.sh
 
-# Set up volumes.
-RUN mkdir -m 750 /synapse /tls /synapse-media
-# Only /synapse is an image volume.
-VOLUME /synapse
+# Set up expected volumes.
+RUN mkdir /secrets /tls /synapse-media && touch /secrets/no-volume /tls/no-volume /synapse-media/no-volume
 
 # Set up user.
 COPY setup-synapse-env.sh /tmp/setup-synapse-env.sh
-RUN chmod +x /tmp/setup-synapse-env.sh && /tmp/setup-synapse-env.sh && rm /tmp/setup-synapse-env.sh
+RUN chmod 555 /tmp/setup-synapse-env.sh && /tmp/setup-synapse-env.sh && rm /tmp/setup-synapse-env.sh
 
-# Copy initialization script.
-COPY initialize-synapse-onetime.sh /initialize-synapse-onetime.sh
-RUN chmod +x /initialize-synapse-onetime.sh
-
+# Copy secret generation script.
+COPY generate-secrets.sh /generate-secrets.sh
+RUN chmod 555 /generate-secrets.sh
 
 # Minimize final image size.
 #RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Run command specification.
+# Main launch script.
 COPY synapse.sh /synapse.sh
 RUN chmod 555 /synapse.sh
 CMD /synapse.sh

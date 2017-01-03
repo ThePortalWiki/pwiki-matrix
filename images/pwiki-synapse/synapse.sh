@@ -114,13 +114,13 @@ config_edit database '{
 	"name": "psycopg2",
 	"args": {
 		"user":     argv[1],
-		"password": argv[2],
+		"password": open(argv[2], "r").read(),
 		"database": argv[3],
 		"host":     argv[4],
 		"cp_min":   5,
 		"cp_max":   10,
 	},
-}' "$SYNAPSE_POSTGRESQL_USER" "$(cat "$SYNAPSE_POSTGRESQL_PASSWORD_FILE")" "$SYNAPSE_POSTGRESQL_DATABASE" "$SYNAPSE_POSTGRESQL_HOST"
+}' "$SYNAPSE_POSTGRESQL_USER" "$SYNAPSE_POSTGRESQL_PASSWORD_FILE" "$SYNAPSE_POSTGRESQL_DATABASE" "$SYNAPSE_POSTGRESQL_HOST"
 
 cat << EOF > "$CONFIG_FILE_LOGGING"
 version: 1

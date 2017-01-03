@@ -71,7 +71,9 @@ $ PWIKI_SYNAPSE_MEDIA=/var/lib/pwiki-synapse/media
 $ chown -R "$PWIKI_SYNAPSE_UID:$PWIKI_SYNAPSE_GID" "$PWIKI_SYNAPSE_MEDIA"
 ```
 
-## Build the Synapse Docker image
+## Build the Docker images
+
+### Synapse image
 
 ```bash
 $ SYNAPSE_DOMAIN=theportalwiki.com
@@ -86,7 +88,7 @@ $ docker build                                   \
     images/pwiki-synapse
 ```
 
-### Build arguments
+#### Build arguments
 
 * `TLS_GID`: The group ID of the TLS mount. Required.
 * `SYNAPSE_UID`: The UID to create the internal user. Optional, default `8449`. Should match `$PWIKI_SYNAPSE_UID`.
@@ -95,13 +97,21 @@ $ docker build                                   \
 * `SYNAPSE_PORT`: The *external* port number that will be forwarded to the Synapse server. `8448` by default. It should either be the default, either be whatever is set as Matrix SRV record for `SYNAPSE_DOMAIN`. Synapse needs this in order to advertise the correct prot externally.
 * `REBUILD`: You can set `--build-arg=REBUILD=$(date)` to force a rebuild and update all packages within.
 
+### PostgreSQL image
+
+```bash
+$ docker build                 \
+    --tag=pwiki-synapse-pgsql  \
+    images/pwiki-synapse-pgsql
+```
+
 ## Generate Synapse secrets volume
 
 You need to generate a bunch of secrets for Synapse to work. The rest of this README assumes that you will be storing them in `/etc/pwiki-synapse/secrets`. These will be mounted into the Synapse container as a volume under `/secrets`. They should only be readable by `root`, both inside and outside the container.
 
 Part of the secrets generation involves generating an `ed25519` signing key using a [special format](https://github.com/matrix-org/python-signedjson), so we use a script bundled within the pwiki-synapse image to generate it.
 
-This only needs to be done once.
+This only needs to be done once but may be safely re-ran as needed if new types of secrets are added. Existing secrets will not be overwritten.
 
 ```bash
 $ PWIKI_SYNAPSE_SECRETS=/etc/pwiki-synapse/secrets
@@ -109,11 +119,12 @@ $ docker run --rm                              \
     --name=pwiki-synapse-secrets               \
     --volume="$PWIKI_SYNAPSE_SECRETS:/secrets" \
     pwiki-synapse /generate-secrets.sh
-$ docker rm pwiki-synapse-secrets
 $ tree "$PWIKI_SYNAPSE_SECRETS"
 /etc/pwiki-synapse/secrets
 ├── macaroon.key
 ├── pepper.key
+├── postgresql_superuser.password
+├── postgresql_synapse.password
 ├── registration.key
 ├── signing.key
 ├── signing_key_id.pub
@@ -122,11 +133,19 @@ $ tree "$PWIKI_SYNAPSE_SECRETS"
 
 Back up all of these files immediately.
 
+## Run the PostgreSQL container
+
+$ docker run --detach                              \
+    --name=pwiki-synapse-pgsql                     \
+    --volume="$PWIKI_SYNAPSE_SECRETS:/secrets"     \
+    pwiki-synapse-pgsql
+
 ## Run the Synapse container
 
 ```bash
-$ docker run --rm                                  \
+$ docker run --detach                              \
     --name=pwiki-synapse                           \
+    --link=pwiki-synapse-pgsql:postgres            \
     --volume="$PWIKI_SYNAPSE_SECRETS:/secrets"     \
     --volume="$PWIKI_SYNAPSE_TLS:/tls"             \
     --volume="$PWIKI_SYNAPSE_MEDIA:/synapse-media" \
@@ -145,7 +164,6 @@ Your Matrix server should now be running.
 * Trust other domains for identity purposes (e.g. `perot.me`, `lagg.me`, `colinjstevens.com` etc.)
 * Allow new channel creation by users
 * Turn down local file logging (it's useless in a container).
-* Set up persistent PostgreSQL database
 * Set up Synapse client port w/ reverse proxying
 * Set up Synapse TURN server
 * Set up other container that shows a fancy web client thing

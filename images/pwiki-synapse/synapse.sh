@@ -19,7 +19,11 @@ MEDIA_DIR=/synapse-media
 CONFIG_DIR=/synapse-config
 CONFIG_FILE="$CONFIG_DIR/synapse.yaml"
 CONFIG_FILE_LOGGING="$CONFIG_DIR/logging.yaml"
-SQLITE_PATH="$CONFIG_DIR/db.sqlite"
+
+SYNAPSE_POSTGRESQL_USER=synapse
+SYNAPSE_POSTGRESQL_PASSWORD_FILE="$SECRETS_DIR/postgresql_synapse.password"
+SYNAPSE_POSTGRESQL_DATABASE=synapse
+SYNAPSE_POSTGRESQL_HOST=postgres
 
 if [ -e "$SECRETS_DIR/no-volume" ]; then
 	echo "Secrets volume '$SECRETS_DIR' not mounted." >&2
@@ -53,38 +57,34 @@ sudo -u synapse python -m synapse.app.homeserver \
 
 rm "$CONFIG_DIR"/*.tls.{key,crt,dh}
 rm "$CONFIG_DIR"/*.log.config
+rm "$CONFIG_DIR"/*.signing.key
 
-# Usage: get_config <variable_name>
-# String values will be surrounded by quotes.
-get_config() {
-	local line
-	line="$(grep -P "^( *$1):[^\\n]+$" "$CONFIG_FILE")"
-	if [ "$?" -ne 0 ]; then
-		echo "Cannot find config entry for '$1'." >&2
-		exit 1
-	fi
-	echo "$line" | cut -d: -f2- | sed -r 's/^ +| +$//g'
+# Usage: config_edit <variable_name> <python expression using `argv`> [argv...]
+config_edit() {
+	local varname expr
+	varname="$1"
+	shift
+	expr="$(echo "$1" | sed -r 's/[\n\t]+/ /g')"
+	shift
+	python -c "if True:
+	import yaml, sys
+	varname = sys.argv[1]
+	argv = sys.argv[1:]
+	c = yaml.load(open('$CONFIG_FILE', 'r'))
+	c[varname] = $expr
+	yaml.dump(c, open('$CONFIG_FILE', 'w'))
+	" "$varname" "$@"
 }
 
-# Usage: get_config_string <variable_name>
-get_config_string() {
-	get_config "$1" | sed -r 's/^"|"$//g'
-}
-
-# Usage: set_config <variable_name> <value>
-# Value must be quoted if it's a string.
-set_config() {
-	if ! grep -qP "^( *(# *)?$1):[^\\n]+$" "$CONFIG_FILE"; then
-		echo "Cannot find config entry for '$1'." >&2
-		exit 1
-	fi
-	sed -ri "s~^( *)(# *)?$1:[^\\n]+$~\\1$1: $2~g" "$CONFIG_FILE"
+# Usage: set_config_raw <variable_name> <value>
+set_config_bool() {
+	config_edit "$1" 'argv[1].lower() == "true"' "$2"
 }
 
 # Usage: set_config <variable_name> <value>
 # Value is expected to be a string.
 set_config_string() {
-	set_config "$1" "\"$2\""
+	config_edit "$1" 'argv[1]' "$2"
 }
 
 set_config_string pid_file /tmp/synapse.pid
@@ -95,9 +95,8 @@ set_config_string tls_certificate_path "$TLS_CERTIFICATE_FILE"
 set_config_string tls_private_key_path "$TLS_PRIVATE_KEY_FILE"
 set_config_string server_name "$SYNAPSE_DOMAIN"
 set_config_string public_baseurl "https://$SYNAPSE_DOMAIN:$SYNAPSE_PORT/"
-set_config enable_metrics True
-set_config web_client False
-set_config_string database "$SQLITE_PATH"
+set_config_bool   enable_metrics True
+set_config_bool   web_client False
 
 # The Diffie-Hellman parameters file needs to be copied rather than read directly, because it
 # is in the /secrets volume which is expected to be solely root-readable.
@@ -110,6 +109,18 @@ set_config_string signing_key_path "$CONFIG_DIR/$(basename "$SIGNING_KEY_FILE")"
 set_config_string pepper "$(cat "$PEPPER_FILE")"
 set_config_string registration_shared_secret "$(cat "$REGISTRATION_SECRET_KEY_FILE")"
 set_config_string macaroon_secret_key "$(cat "$MACAROON_SECRET_KEY_FILE")"
+
+config_edit database '{
+	"name": "psycopg2",
+	"args": {
+		"user":     argv[1],
+		"password": argv[2],
+		"database": argv[3],
+		"host":     argv[4],
+		"cp_min":   5,
+		"cp_max":   10,
+	},
+}' "$SYNAPSE_POSTGRESQL_USER" "$(cat "$SYNAPSE_POSTGRESQL_PASSWORD_FILE")" "$SYNAPSE_POSTGRESQL_DATABASE" "$SYNAPSE_POSTGRESQL_HOST"
 
 cat << EOF > "$CONFIG_FILE_LOGGING"
 version: 1

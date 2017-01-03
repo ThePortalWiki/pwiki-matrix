@@ -59,5 +59,21 @@ else
 	echo "Registration secret key file exists: '$REGISTRATION_SECRET_KEY_FILE'" >&2
 fi
 
+POSTGRESQL_SUPERUSER_PASSWORD_FILE="$SECRETS_DIR/postgresql_superuser.password"
+if [ ! -f "$POSTGRESQL_SUPERUSER_PASSWORD_FILE" ]; then
+	echo "Generating PostgreSQL superuser password file '$POSTGRESQL_SUPERUSER_PASSWORD_FILE'..." >&2
+	openssl rand -base64 32 | tr -d '\n' > "$POSTGRESQL_SUPERUSER_PASSWORD_FILE"
+else
+	echo "PostgreSQL superuser password file exists: '$POSTGRESQL_SUPERUSER_PASSWORD_FILE'" >&2
+fi
+
+POSTGRESQL_SYNAPSE_PASSWORD_FILE="$SECRETS_DIR/postgresql_synapse.password"
+if [ ! -f "$POSTGRESQL_SYNAPSE_PASSWORD_FILE" ]; then
+	echo "Generating PostgreSQL Synapse password file '$POSTGRESQL_SYNAPSE_PASSWORD_FILE'..." >&2
+	openssl rand -base64 32 | tr -d '\n' > "$POSTGRESQL_SYNAPSE_PASSWORD_FILE"
+else
+	echo "PostgreSQL Synapse password file exists: '$POSTGRESQL_SYNAPSE_PASSWORD_FILE'" >&2
+fi
+
 chmod -R g-rwx,o-rwx "$SECRETS_DIR"
 chown -R root:root "$SECRETS_DIR"

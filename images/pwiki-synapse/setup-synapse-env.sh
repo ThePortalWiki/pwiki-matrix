@@ -10,11 +10,11 @@ SYNAPSE_SECRET_GROUP=synapse-secret
 
 # Variables from build arguments.
 fail=0
-[ -n "$SYNAPSE_UID" ] || (echo 'SYNAPSE_UID build argument not specified.' >&2; fail=1)
-[ -n "$SYNAPSE_GID" ] || (echo 'SYNAPSE_GID build argument not specified.' >&2; fail=1)
-[ -n "$TLS_GID" ] || (echo 'TLS_GID build argument not specified.' >&2; fail=1)
-[ -n "$SYNAPSE_DOMAIN" ] || (echo 'SYNAPSE_DOMAIN build argument not specified.' >&2; fail=1)
-[ -n "$SYNAPSE_PORT" ] || (echo 'SYNAPSE_PORT build argument not specified.' >&2; fail=1)
+[ -n "$SYNAPSE_UID" ] || { echo 'SYNAPSE_UID build argument not specified.' >&2; fail=1; }
+[ -n "$SYNAPSE_GID" ] || { echo 'SYNAPSE_GID build argument not specified.' >&2; fail=1; }
+[ -n "$TLS_GID" ] || { echo 'TLS_GID build argument not specified.' >&2; fail=1; }
+[ -n "$SYNAPSE_DOMAIN" ] || { echo 'SYNAPSE_DOMAIN build argument not specified.' >&2; fail=1; }
+[ -n "$SYNAPSE_PORT" ] || { echo 'SYNAPSE_PORT build argument not specified.' >&2; fail=1; }
 if [ "$fail" -eq 1 ]; then
 	exit 1
 fi

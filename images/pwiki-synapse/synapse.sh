@@ -59,6 +59,20 @@ rm "$CONFIG_DIR"/*.tls.{key,crt,dh}
 rm "$CONFIG_DIR"/*.log.config
 rm "$CONFIG_DIR"/*.signing.key
 
+# Usage: config_operation <python line of code using `c` and `argv`> [argv...]
+config_operation() {
+	local code
+	code="$(echo "$1" | sed -r 's/[\n\t]+/ /g')"
+	shift
+	python -c "if True:
+	import yaml, sys
+	argv = sys.argv[1:]
+	c = yaml.load(open('$CONFIG_FILE', 'r'))
+	$code
+	yaml.dump(c, open('$CONFIG_FILE', 'w'))
+	" "$@"
+}
+
 # Usage: config_edit <variable_name> <python expression using `argv`> [argv...]
 config_edit() {
 	local varname expr
@@ -66,25 +80,23 @@ config_edit() {
 	shift
 	expr="$(echo "$1" | sed -r 's/[\n\t]+/ /g')"
 	shift
-	python -c "if True:
-	import yaml, sys
-	varname = sys.argv[1]
-	argv = sys.argv[1:]
-	c = yaml.load(open('$CONFIG_FILE', 'r'))
-	c[varname] = $expr
-	yaml.dump(c, open('$CONFIG_FILE', 'w'))
-	" "$varname" "$@"
+	config_operation "varname = argv[0]; argv = argv[1:]; c[varname] = $expr" "$varname" "$@"
+}
+
+# Usage: unset_config <variable_name>
+unset_config() {
+	config_operation "del c[argv[0]]" "$1"
 }
 
 # Usage: set_config_raw <variable_name> <value>
 set_config_bool() {
-	config_edit "$1" 'argv[1].lower() == "true"' "$2"
+	config_edit "$1" 'argv[0].lower() == "true"' "$2"
 }
 
 # Usage: set_config <variable_name> <value>
 # Value is expected to be a string.
 set_config_string() {
-	config_edit "$1" 'argv[1]' "$2"
+	config_edit "$1" 'argv[0]' "$2"
 }
 
 set_config_string pid_file /tmp/synapse.pid
@@ -113,10 +125,10 @@ set_config_string macaroon_secret_key "$(cat "$MACAROON_SECRET_KEY_FILE")"
 config_edit database '{
 	"name": "psycopg2",
 	"args": {
-		"user":     argv[1],
-		"password": open(argv[2], "r").read(),
-		"database": argv[3],
-		"host":     argv[4],
+		"user":     argv[0],
+		"password": open(argv[1], "r").read(),
+		"database": argv[2],
+		"host":     argv[3],
 		"cp_min":   5,
 		"cp_max":   10,
 	},
@@ -147,6 +159,7 @@ root:
     handlers: [console]
 EOF
 set_config_string log_config "$CONFIG_FILE_LOGGING"
+unset_config log_file
 chown -R "$SYNAPSE_UID:$SYNAPSE_GID" "$CONFIG_DIR"
 chmod -R g-w,o-rwx "$CONFIG_DIR"
 

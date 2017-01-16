@@ -57,7 +57,7 @@ Access: 2016-12-30 17:59:09.120460354 -0500
 Modify: 2016-12-30 17:59:09.120460354 -0500
 Change: 2016-12-30 17:59:22.193321816 -0500
  Birth: -
-$ PWIKI_TLS_GID=$(stat -c '%g' $PWIKI_SYNAPSE_TLS)
+$ PWIKI_TLS_GID="$(stat -c '%g' "$(readlink -e "$PWIKI_SYNAPSE_TLS")")"
 ```
 
 ### Media volume
@@ -150,12 +150,17 @@ $ docker run --detach                              \
     --volume="$PWIKI_SYNAPSE_TLS:/tls"             \
     --volume="$PWIKI_SYNAPSE_MEDIA:/synapse-media" \
     --publish="$SYNAPSE_PORT:8448"                 \
+    --log-driver=journald                          \
     pwiki-synapse
 ```
 
 This binds to the port `$SYNAPSE_PORT` on the host. Note that the Docker-side port should always be `8448`.
 
-Your Matrix server should now be running.
+Your Matrix server should now be running. Logs can be read with
+
+```bash
+$ journalctl CONTAINER_NAME=pwiki-synapse
+```
 
 ## More to come...
 
@@ -163,7 +168,6 @@ Your Matrix server should now be running.
 
 * Trust other domains for identity purposes (e.g. `perot.me`, `lagg.me`, `colinjstevens.com` etc.)
 * Allow new channel creation by users
-* Turn down local file logging (it's useless in a container).
 * Set up Synapse client port w/ reverse proxying
 * Set up Synapse TURN server
 * Set up other container that shows a fancy web client thing

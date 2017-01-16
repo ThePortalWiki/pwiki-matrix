@@ -211,6 +211,14 @@ Your Matrix server should now be running. Logs can be read with
 $ journalctl CONTAINER_NAME=pwiki-synapse
 ```
 
+## Save all these variables for future use
+
+By this point you have a lot of `IMPORTANT_UPPERCASE_VARIABLES` in your shell. Here's how to save them for the next time to run some `docker run` commands or the like.
+
+```bash
+$ ( set -o posix ; set ) | ./resources/save-important-variables.sh > /etc/pwiki-synapse/sourceme.sh
+```
+
 ## More to come...
 
 # TODO
@@ -223,6 +231,7 @@ $ journalctl CONTAINER_NAME=pwiki-synapse
 * Enable URL preview API
 * Set up PostgreSQL backups
 * Add LetsEncrypt auto cert renewal details
+* Add script to generate systemd units for building and running the containers with the correct arguments
 
 [Matrix.org]: https://matrix.org/
 [Synapse]: https://github.com/matrix-org/synapse

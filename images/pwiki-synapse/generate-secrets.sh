@@ -59,6 +59,14 @@ else
 	echo "Registration secret key file exists: '$REGISTRATION_SECRET_KEY_FILE'" >&2
 fi
 
+TURN_SHARED_SECRET_FILE="$SECRETS_DIR/turn_shared_secret.key"
+if [ ! -f "$TURN_SHARED_SECRET_FILE" ]; then
+	echo "Generating TURN shared secret file '$TURN_SHARED_SECRET_FILE'..." >&2
+	openssl rand -base64 50 | tr -d '\n' > "$TURN_SHARED_SECRET_FILE"
+else
+	echo "TURN shared secret file exists: '$TURN_SHARED_SECRET_FILE'" >&2
+fi
+
 POSTGRESQL_SUPERUSER_PASSWORD_FILE="$SECRETS_DIR/postgresql_superuser.password"
 if [ ! -f "$POSTGRESQL_SUPERUSER_PASSWORD_FILE" ]; then
 	echo "Generating PostgreSQL superuser password file '$POSTGRESQL_SUPERUSER_PASSWORD_FILE'..." >&2

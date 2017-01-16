@@ -7,6 +7,8 @@ ARG SYNAPSE_GID=8449
 ARG TLS_GID
 ARG SYNAPSE_DOMAIN=theportalwiki.com
 ARG SYNAPSE_PORT=8449
+ARG COTURN_DOMAIN
+ARG COTURN_PORT=3478
 
 # Update initial image.
 RUN apt-get update && apt-get upgrade -y
@@ -18,7 +20,7 @@ RUN chmod 555 /tmp/get-synapse.sh && /tmp/get-synapse.sh && rm /tmp/get-synapse.
 # Set up expected volumes.
 RUN mkdir /secrets /tls /synapse-media && touch /secrets/no-volume /tls/no-volume /synapse-media/no-volume
 
-# Set up user.
+# Set up user and environment.
 COPY setup-synapse-env.sh /tmp/setup-synapse-env.sh
 RUN chmod 555 /tmp/setup-synapse-env.sh && /tmp/setup-synapse-env.sh && rm /tmp/setup-synapse-env.sh
 

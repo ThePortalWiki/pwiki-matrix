@@ -73,6 +73,36 @@ $ chown -R "$PWIKI_SYNAPSE_UID:$PWIKI_SYNAPSE_GID" "$PWIKI_SYNAPSE_MEDIA"
 
 ## Build the Docker images
 
+### TURN server image
+
+Synapse requires a TURN server for establishing VoIP connections. This runs in a separate container running a [coturn](https://github.com/coturn/coturn) server. Synapse communicates to coturn using a shared secret key in order to set up credentials that users can then use on the TURN server.
+
+Like the Synapse server, it supports TLS, so it also requires access to the TLS cert and key file.
+
+```bash
+$ COTURN_UID=3478
+$ COTURN_GID=3478
+$ COTURN_DOMAIN=theportalwiki.com
+$ COTURN_PORT=3478
+$ docker build                                 \
+    --build-arg="COTURN_UID=$COTURN_UID"       \
+    --build-arg="COTURN_GID=$COTURN_GID"       \
+    --build-arg="TLS_GID=$PWIKI_TLS_GID"       \
+    --build-arg="COTURN_DOMAIN=$COTURN_DOMAIN" \
+    --build-arg="COTURN_PORT=$COTURN_PORT"     \
+    --tag=pwiki-synapse-coturn                 \
+    images/pwiki-synapse-coturn
+```
+
+#### Build arguments
+
+* `COTURN_UID`: The UID to create the internal user. Optional, default `3478`.
+* `COTURN_UID`: The GID to create the internal user. Optional, default `3478`.
+* `TLS_GID`: The group ID of the TLS mount. Required.
+* `COTURN_DOMAIN`: The external domain name to advertise. Required.
+* `COTURN_PORT`: The port number for TCP and UDP TURN requests. Optional. Default `3478`.
+* `REBUILD`: You can set `--build-arg=REBUILD=$(date)` to force a rebuild and update all packages within.
+
 ### Synapse image
 
 ```bash
@@ -84,6 +114,8 @@ $ docker build                                   \
     --build-arg="TLS_GID=$PWIKI_TLS_GID"         \
     --build-arg="SYNAPSE_DOMAIN=$SYNAPSE_DOMAIN" \
     --build-arg="SYNAPSE_PORT=$SYNAPSE_PORT"     \
+    --build-arg="COTURN_DOMAIN=$COTURN_DOMAIN"   \
+    --build-arg="COTURN_PORT=$COTURN_PORT"       \
     --tag=pwiki-synapse                          \
     images/pwiki-synapse
 ```
@@ -95,6 +127,8 @@ $ docker build                                   \
 * `SYNAPSE_GID`: The GID to create the internal user. Optional, default `8449`. Should match `$PWIKI_SYNAPSE_GID`.
 * `SYNAPSE_DOMAIN`: The domain name for the Synapse server. You can change this to reuse the image for non-pwiki purposes.
 * `SYNAPSE_PORT`: The *external* port number that will be forwarded to the Synapse server. `8448` by default. It should either be the default, either be whatever is set as Matrix SRV record for `SYNAPSE_DOMAIN`. Synapse needs this in order to advertise the correct prot externally.
+* `COTURN_DOMAIN`: The external domain name to advertise for TURN. Optional. Defaults to `$SYNAPSE_DOMAIN`.
+* `COTURN_PORT`: The port number for TCP and UDP TURN requests. Optional. Default `3478`.
 * `REBUILD`: You can set `--build-arg=REBUILD=$(date)` to force a rebuild and update all packages within.
 
 ### PostgreSQL image
@@ -128,7 +162,8 @@ $ tree "$PWIKI_SYNAPSE_SECRETS"
 ├── registration.key
 ├── signing.key
 ├── signing_key_id.pub
-└── tls.dh
+├── tls.dh
+└── turn_shared_secret.key
 ```
 
 Back up all of these files immediately.
@@ -138,7 +173,21 @@ Back up all of these files immediately.
 $ docker run --detach                              \
     --name=pwiki-synapse-pgsql                     \
     --volume="$PWIKI_SYNAPSE_SECRETS:/secrets"     \
+    --log-driver=journald                          \
     pwiki-synapse-pgsql
+
+## Run the coturn container
+
+```bash
+$ docker run --detach                              \
+    --name=pwiki-synapse-coturn                    \
+    --volume="$PWIKI_SYNAPSE_SECRETS:/secrets"     \
+    --volume="$PWIKI_SYNAPSE_TLS:/tls"             \
+    --publish="$COTURN_PORT:$COTURN_PORT/tcp"      \
+    --publish="$COTURN_PORT:$COTURN_PORT/udp"      \
+    --log-driver=journald                          \
+    pwiki-synapse-coturn
+```
 
 ## Run the Synapse container
 
@@ -169,7 +218,6 @@ $ journalctl CONTAINER_NAME=pwiki-synapse
 * Trust other domains for identity purposes (e.g. `perot.me`, `lagg.me`, `colinjstevens.com` etc.)
 * Allow new channel creation by users
 * Set up Synapse client port w/ reverse proxying
-* Set up Synapse TURN server
 * Set up other container that shows a fancy web client thing
 * Allow guest registration (requirs ReCaptcha)? Or at least guest viewing
 * Enable URL preview API

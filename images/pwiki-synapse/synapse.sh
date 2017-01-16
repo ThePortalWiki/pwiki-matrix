@@ -9,6 +9,7 @@ DH_PARAMS_FILE="$SECRETS_DIR/tls.dh"
 PEPPER_FILE="$SECRETS_DIR/pepper.key"
 MACAROON_SECRET_KEY_FILE="$SECRETS_DIR/macaroon.key"
 REGISTRATION_SECRET_KEY_FILE="$SECRETS_DIR/registration.key"
+TURN_SHARED_SECRET_FILE="$SECRETS_DIR/turn_shared_secret.key"
 
 TLS_DIR=/tls
 TLS_CERTIFICATE_FILE="$TLS_DIR/tls.crt"
@@ -88,9 +89,14 @@ unset_config() {
 	config_operation "del c[argv[0]]" "$1"
 }
 
-# Usage: set_config_raw <variable_name> <value>
+# Usage: set_config_bool <variable_name> <value>
 set_config_bool() {
 	config_edit "$1" 'argv[0].lower() == "true"' "$2"
+}
+
+# Usage: set_config_int <variable_name> <value>
+set_config_int() {
+	config_edit "$1" 'int(argv[0], 10)' "$2"
 }
 
 # Usage: set_config <variable_name> <value>
@@ -133,6 +139,14 @@ set_config_string signing_key_path "$CONFIG_DIR/$(basename "$SIGNING_KEY_FILE")"
 set_config_string pepper "$(cat "$PEPPER_FILE")"
 set_config_string registration_shared_secret "$(cat "$REGISTRATION_SECRET_KEY_FILE")"
 set_config_string macaroon_secret_key "$(cat "$MACAROON_SECRET_KEY_FILE")"
+
+# TURN server configuration.
+config_edit turn_uris '[
+	"turn:%s:%d?transport=udp" % (argv[0], int(argv[1])),
+	"turn:%s:%d?transport=tcp" % (argv[0], int(argv[1])),
+]' "$COTURN_DOMAIN" "$COTURN_PORT"
+set_config_string turn_shared_secret "$(cat "$TURN_SHARED_SECRET_FILE")"
+set_config_int turn_user_lifetime "$((24 * 3600 * 1000))"  # 24h
 
 config_edit database '{
 	"name": "psycopg2",

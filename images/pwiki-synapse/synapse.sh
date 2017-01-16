@@ -108,7 +108,19 @@ set_config_string tls_private_key_path "$TLS_PRIVATE_KEY_FILE"
 set_config_string server_name "$SYNAPSE_DOMAIN"
 set_config_string public_baseurl "https://$SYNAPSE_DOMAIN:$SYNAPSE_PORT/"
 set_config_bool   enable_metrics True
+
+# Remove debug port.
+# It's not exposed outside the container but there's no reason to have it anyway.
+config_operation 'c["listeners"] = [l for l in c["listeners"] if l["port"] == 8448]'
+# Make sure we only have one listener left.
+config_operation 'assert len(c["listeners"]) == 1, "More than one listener left."'
+# Remove deprecated web client from the one listener.
 set_config_bool   web_client False
+config_operation 'c["listeners"][0]["resources"] = [{
+	"compress": True,
+	"names": ["client", "federation"],
+}]'
+config_operation 'c["listeners"][0]["tls"] = True'  # Ensure TLS is enabled.
 
 # The Diffie-Hellman parameters file needs to be copied rather than read directly, because it
 # is in the /secrets volume which is expected to be solely root-readable.

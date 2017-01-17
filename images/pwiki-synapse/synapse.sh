@@ -110,7 +110,11 @@ set_config_string pid_file /tmp/synapse.pid
 set_config_string media_store_path "$MEDIA_DIR/media"
 set_config_string uploads_path "$MEDIA_DIR/uploads"
 set_config_string tls_certificate_path "$TLS_CERTIFICATE_FILE"
-set_config_string tls_private_key_path "$TLS_PRIVATE_KEY_FILE"
+# Purposefully empty key; the server is reverse-proxied, so it does not need to use the TLS
+# key by itself. It still needs the certificate however, because it uses it as part of the
+# federation protocol.
+set_config_string tls_private_key_path ''
+set_config_bool   no_tls True
 set_config_string server_name "$SYNAPSE_DOMAIN"
 set_config_string public_baseurl "https://$SYNAPSE_DOMAIN:$SYNAPSE_PORT/"
 set_config_bool   enable_metrics True
@@ -126,7 +130,8 @@ config_operation 'c["listeners"][0]["resources"] = [{
 	"compress": True,
 	"names": ["client", "federation"],
 }]'
-config_operation 'c["listeners"][0]["tls"] = True'  # Ensure TLS is enabled.
+# Ensure TLS is disabled, since the port is reverse-proxied.
+config_operation 'c["listeners"][0]["tls"] = False'
 
 # The Diffie-Hellman parameters file needs to be copied rather than read directly, because it
 # is in the /secrets volume which is expected to be solely root-readable.

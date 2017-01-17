@@ -12,6 +12,17 @@ See [Matrix.org].
 
 # How do I use it?
 
+## DNS setup
+
+Make sure to set up an SRV record pointing to port `443` on the host that will be running the Synapse server.
+
+```bash
+$ dig -t srv _matrix._tcp.theportalwiki.com
+_matrix._tcp.theportalwiki.com. 3600    IN      SRV     10 0 443 theportalwiki.com.
+```
+
+Because we will reverse-proxy the Synapse server, please do *not* use port `443` for `SYNAPSE_PORT` below. `SYNAPSE_PORT` is the host-local port to which the Synapse server will be bound.
+
 ## Host setup
 
 ### Checkout the repo
@@ -126,7 +137,7 @@ $ docker build                                   \
 * `SYNAPSE_UID`: The UID to create the internal user. Optional, default `8449`. Should match `$PWIKI_SYNAPSE_UID`.
 * `SYNAPSE_GID`: The GID to create the internal user. Optional, default `8449`. Should match `$PWIKI_SYNAPSE_GID`.
 * `SYNAPSE_DOMAIN`: The domain name for the Synapse server. You can change this to reuse the image for non-pwiki purposes.
-* `SYNAPSE_PORT`: The *external* port number that will be forwarded to the Synapse server. `8448` by default. It should either be the default, either be whatever is set as Matrix SRV record for `SYNAPSE_DOMAIN`. Synapse needs this in order to advertise the correct prot externally.
+* `SYNAPSE_PORT`: The *host-local* port number that will be forwarded to the Synapse server. `8448` by default. It is only used in order to point the nginx reserve proxy to it; it does not need to match whatever is set as Matrix SRV record for `SYNAPSE_DOMAIN`. It is only useful to be able to modify this port if you have more than one Synapse server running on the same host.
 * `COTURN_DOMAIN`: The external domain name to advertise for TURN. Optional. Defaults to `$SYNAPSE_DOMAIN`.
 * `COTURN_PORT`: The port number for TCP and UDP TURN requests. Optional. Default `3478`.
 * `REBUILD`: You can set `--build-arg=REBUILD=$(date)` to force a rebuild and update all packages within.
@@ -198,17 +209,62 @@ $ docker run --detach                              \
     --volume="$PWIKI_SYNAPSE_SECRETS:/secrets"     \
     --volume="$PWIKI_SYNAPSE_TLS:/tls"             \
     --volume="$PWIKI_SYNAPSE_MEDIA:/synapse-media" \
-    --publish="$SYNAPSE_PORT:8448"                 \
+    --publish="127.0.0.1:$SYNAPSE_PORT:8448"       \
     --log-driver=journald                          \
     pwiki-synapse
 ```
 
-This binds to the port `$SYNAPSE_PORT` on the host. Note that the Docker-side port should always be `8448`.
+This binds to the port `$SYNAPSE_PORT` on the host's `lo` interface. Note that the Docker-side port should always be `8448`.
 
 Your Matrix server should now be running. Logs can be read with
 
 ```bash
 $ journalctl CONTAINER_NAME=pwiki-synapse
+```
+
+## Set up nginx reverse proxying
+
+The above command doesn't expose the server to the outside world. Instead, you should reserve-proxy it behind nginx. This [doesn't actually have many advantages](https://github.com/matrix-org/synapse#reverse-proxying-the-federation-port) but it does mean that your server can be reached on the default TLS port (`443`) rather than `8448`.
+
+```bash
+$ ./resources/generate-nginx-config.sh           \
+    --domain="$SYNAPSE_DOMAIN"                   \
+    --tls-key="$PWIKI_SYNAPSE_TLS/tls.key"       \
+    --tls-cert="$PWIKI_SYNAPSE_TLS/tls.crt"      \
+    --dh-params="$PWIKI_SYNAPSE_SECRETS/tls.dh"  \
+    --synapse-port="$SYNAPSE_PORT"               \
+    | tee "/etc/nginx/conf/synapse-$SYNAPSE_DOMAIN.conf"
+```
+
+The script will generate a config file that looks roughly like this:
+
+```nginx
+server {
+    server_name "theportalwiki.com";
+    listen 443 default_server ssl;
+    listen [::]:443 default_server ssl;
+    ... More TLS stuff...
+    # include "your_custom_file_here.conf";
+    location /_matrix {
+        ... Proxy stuff...
+    }
+}
+```
+
+You may optionally pass an extra `--include=your_custom_file_here.conf` argument, which will add an `include "your_custom_file_here.conf";` line in the middle of the generated `server` block. This lets you reuse the server block for non-Matrix purposes.
+
+Note: This uses the `default_server` directive, which means that this `server` block will be selected for all requests sent to port 443. This is necessary because [Synapse does not currently support SNI on the federation port](https://github.com/matrix-org/synapse/issues/1491). This has the side-effect that you cannot run two Synapse servers on the same host with reverse-proxying on port 443, and that any other HTTPS website running on this host with `default_server` will need to be modified to remove the `default_server` directive. These sites will no longer work without SNI.
+
+Make sure that the user nginx runs as can read all the TLS files given as argument, then reload nginx.
+
+```bash
+$ systemctl reload nginx
+```
+
+You can verify that everything works by visiting using the Matrix.org `federationtester` tool:
+
+```bash
+$ curl "https://matrix.org/federationtester/api/report?server_name=$SYNAPSE_DOMAIN"
 ```
 
 ## Save all these variables for future use
@@ -219,13 +275,18 @@ By this point you have a lot of `IMPORTANT_UPPERCASE_VARIABLES` in your shell. H
 $ ( set -o posix ; set ) | ./resources/save-important-variables.sh > /etc/pwiki-synapse/sourceme.sh
 ```
 
+You can then restore the variables in another shell session with:
+
+```bash
+$ source /etc/pwiki-synapse/sourceme.sh
+```
+
 ## More to come...
 
 # TODO
 
 * Trust other domains for identity purposes (e.g. `perot.me`, `lagg.me`, `colinjstevens.com` etc.)
 * Allow new channel creation by users
-* Set up Synapse client port w/ reverse proxying
 * Set up other container that shows a fancy web client thing
 * Allow guest registration (requirs ReCaptcha)? Or at least guest viewing
 * Enable URL preview API

@@ -181,11 +181,13 @@ Back up all of these files immediately.
 
 ## Run the PostgreSQL container
 
+```bash
 $ docker run --detach                              \
     --name=pwiki-synapse-pgsql                     \
     --volume="$PWIKI_SYNAPSE_SECRETS:/secrets"     \
     --log-driver=journald                          \
     pwiki-synapse-pgsql
+```
 
 ## Run the coturn container
 

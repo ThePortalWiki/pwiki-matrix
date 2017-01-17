@@ -185,6 +185,12 @@ loggers:
         level: INFO
     synapse.storage.SQL:
         level: INFO
+    synapse.handlers.typing:
+        level: WARN
+    synapse.handlers.presence:
+        level: WARN
+    synapse.storage.TIME:
+        level: WARN
 root:
     level: INFO
     handlers: [console]

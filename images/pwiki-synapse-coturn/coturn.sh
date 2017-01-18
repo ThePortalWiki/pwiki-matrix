@@ -8,8 +8,8 @@ DH_PARAMS_FILE="$SECRETS_DIR/tls.dh"
 TURN_SHARED_SECRET_FILE="$SECRETS_DIR/turn_shared_secret.key"
 
 TLS_DIR=/tls
-TLS_CERTIFICATE_FILE="$TLS_DIR/tls.crt"
-TLS_PRIVATE_KEY_FILE="$TLS_DIR/tls.key"
+TLS_CERTIFICATE_FILE="$TLS_DIR/fullchain.pem"
+TLS_PRIVATE_KEY_FILE="$TLS_DIR/privkey.pem"
 
 CONFIG_DIR=/coturn-config
 CONFIG_FILE="$CONFIG_DIR/coturn.conf"

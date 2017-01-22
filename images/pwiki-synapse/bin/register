@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+SECRETS_DIR="/secrets"
+if [ -e "$SECRETS_DIR/no-volume" ]; then
+	echo "Secrets volume '$SECRETS_DIR' not mounted." >&2
+	exit 1
+fi
+
+REGISTRATION_SECRET_KEY_FILE="$(cat "$SECRETS_DIR/registration.key")"
+
+source /synapse.env
+
+# In order to avoid leaking the shared secret to `/proc`, this create a
+# minimal YAML config file that the register_new_matrix_user script can
+# read in. Better to avoid using echo here for the very same reason.
+TMP_REGISTRATION="$(mktemp --suffix=_synapse_registration)"
+cat << EOF > "$TMP_REGISTRATION"
+registration_shared_secret: "$REGISTRATION_SECRET_KEY_FILE"
+EOF
+
+# Note the lack of port here; this is because at this point we expect the
+# server to be properly reverse-proxied.
+register_new_matrix_user --config="$TMP_REGISTRATION" "$@" "https://$SYNAPSE_DOMAIN"
+retCode="$?"
+rm -f "$TMP_REGISTRATION"
+exit "$retCode"

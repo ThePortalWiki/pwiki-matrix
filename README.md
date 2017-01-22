@@ -163,7 +163,7 @@ $ PWIKI_SYNAPSE_SECRETS=/etc/pwiki-synapse/secrets
 $ docker run --rm                              \
     --name=pwiki-synapse-secrets               \
     --volume="$PWIKI_SYNAPSE_SECRETS:/secrets" \
-    pwiki-synapse /generate-secrets.sh
+    pwiki-synapse generate-secrets
 $ tree "$PWIKI_SYNAPSE_SECRETS"
 /etc/pwiki-synapse/secrets
 ├── macaroon.key
@@ -268,6 +268,26 @@ You can verify that everything works by visiting using the Matrix.org `federatio
 ```bash
 $ curl "https://matrix.org/federationtester/api/report?server_name=$SYNAPSE_DOMAIN"
 ```
+
+## Registering users
+
+You can register users manually using the built-in registration script bundled inside the `pwiki-synapse` image. Note that this requires the Synapse server to already be running.
+
+```bash
+$ docker run --rm -it                           \
+    --volume="$PWIKI_SYNAPSE_SECRETS:/secrets"  \
+    pwiki-synapse register                      \
+    --username=root --password=hunter2          \
+    --admin=true
+```
+
+The arguments are a subset of [Synapse's own `register_new_matrix_user` script](https://github.com/matrix-org/synapse/blob/master/scripts/register_new_matrix_user), as the other arguments are taken care of for you.
+
+### Arguments
+
+* `-u` or `--user=foo`: Username for the new user.
+* `-p` or `--password=foo`: Raw password for the new user. If unspecified, will be prompted interactively.
+* `-a` or `--admin=true|false`: Whether the user is an admin on the server.
 
 ## Save all these variables for future use
 

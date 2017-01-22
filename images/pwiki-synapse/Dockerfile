@@ -24,9 +24,10 @@ RUN mkdir /secrets /tls /synapse-media && touch /secrets/no-volume /tls/no-volum
 COPY setup-synapse-env.sh /tmp/setup-synapse-env.sh
 RUN chmod 555 /tmp/setup-synapse-env.sh && /tmp/setup-synapse-env.sh && rm /tmp/setup-synapse-env.sh
 
-# Copy secret generation script.
-COPY generate-secrets.sh /generate-secrets.sh
-RUN chmod 555 /generate-secrets.sh
+# Copy scripts.
+COPY bin/generate-secrets /bin/generate-secrets
+COPY bin/register /bin/register
+RUN chmod 555 /bin/generate-secrets /bin/register
 
 # Minimize final image size.
 #RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*

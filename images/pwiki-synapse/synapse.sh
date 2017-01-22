@@ -153,6 +153,7 @@ config_edit turn_uris '[
 set_config_string turn_shared_secret "$(cat "$TURN_SHARED_SECRET_FILE")"
 set_config_int turn_user_lifetime "$((24 * 3600 * 1000))"  # 24h
 
+# Database configuration.
 config_edit database '{
 	"name": "psycopg2",
 	"args": {
@@ -165,6 +166,31 @@ config_edit database '{
 	},
 }' "$SYNAPSE_POSTGRESQL_USER" "$SYNAPSE_POSTGRESQL_PASSWORD_FILE" "$SYNAPSE_POSTGRESQL_DATABASE" "$SYNAPSE_POSTGRESQL_HOST"
 
+# URL preview API configuration.
+config_edit url_preview_ip_range_blacklist '[
+	"127.0.0.0/8",
+	"10.0.0.0/8",
+	"172.16.0.0/12",
+	"192.168.0.0/16",
+	"100.64.0.0/10",
+	"169.254.0.0/16",
+	"::/128",
+	"::1/128",
+	"fc00::/7",
+	"fe80::/10",
+	"ff00::/8",
+]'
+config_edit url_preview_ip_range_whitelist '[]'
+config_edit url_preview_url_blacklist '[
+	{"username": "*"},
+	{"netloc": "google.com"},
+	{"netloc": "*.google.com"},
+	{"schema": "http"},
+]'
+set_config_string max_spider_size 8M
+set_config_bool url_preview_enabled True
+
+# Logging configuration.
 cat << EOF > "$CONFIG_FILE_LOGGING"
 version: 1
 formatters:
@@ -197,6 +223,8 @@ root:
 EOF
 set_config_string log_config "$CONFIG_FILE_LOGGING"
 unset_config log_file
+
+# Reset config directory permissions before launching Synapse.
 chown -R "$SYNAPSE_UID:$SYNAPSE_GID" "$CONFIG_DIR"
 chmod -R g-w,o-rwx "$CONFIG_DIR"
 

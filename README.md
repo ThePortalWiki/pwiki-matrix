@@ -291,7 +291,6 @@ $ source /etc/pwiki-synapse/sourceme.sh
 * Allow new channel creation by users
 * Set up other container that shows a fancy web client thing
 * Allow guest registration (requires ReCaptcha)? Or at least guest viewing
-* Enable URL preview API
 * Set up PostgreSQL backups
 * Add script to generate systemd units for building and running the containers with the correct arguments
 
